@@ -1,109 +1,197 @@
+
+
+
 const express = require('express')
 const cors = require('cors')
 const { Sequelize, DataTypes } = require('sequelize')
 
 // conexão com banco
-const sequelize = new Sequelize('db_projeto', 'root', '', {
-    host: 'localhost',
-    dialect: 'mysql'
+const sequelize = new Sequelize('db_atv', 'root', '', {
+host: 'localhost',
+dialect: 'mysql'
 })
 
-// modelo
-const Cliente = sequelize.define('Cliente', {
-    nome: {
-        type: DataTypes.STRING,
-        allowNull: false
-    },
-    email: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        unique: true
-    },
-    telefone: {
-        type: DataTypes.STRING
-    }
+
+
+// FUNCIONARIO
+const Funcionario = sequelize.define('Funcionario', {
+nome: {
+type: DataTypes.STRING,
+allowNull: false
+},
+cpf: {
+type: DataTypes.STRING,
+allowNull: false,
+unique: true
+},
+data_nascimento: {
+type: DataTypes.DATEONLY
+},
+email: {
+type: DataTypes.STRING,
+allowNull: false,
+unique: true
+}
 })
 
-// servidor
+// LIVRO
+const Livro = sequelize.define('Livro', {
+titulo: {
+type: DataTypes.STRING,
+allowNull: false
+},
+autor: {
+type: DataTypes.STRING,
+allowNull: false
+},
+numero_paginas: {
+type: DataTypes.INTEGER
+},
+preco: {
+type: DataTypes.FLOAT
+}
+})
+
+
+// RELACIONAMENTO
+
+Funcionario.hasMany(Livro, { foreignKey: 'funcionarioId' })
+Livro.belongsTo(Funcionario, { foreignKey: 'funcionarioId' })
+
+
+// SERVIDOR
+
 const app = express()
 app.use(cors())
 app.use(express.json())
 
 const port = 3001
 
-// rotas
-app.get('/clientes', async (req, res) => {
-    const todosOsClientes = await Cliente.findAll()
-    res.json(todosOsClientes)
+
+// ROTAS FUNCIONARIO
+
+
+// GET
+app.get('/funcionarios', async (req, res) => {
+const dados = await Funcionario.findAll()
+res.json(dados)
 })
 
-app.post('/clientes', async (req, res) => {
+// POST
+app.post('/funcionarios', async (req, res) => {
+try {
+const novo = await Funcionario.create(req.body)
+
+res.status(201).json({
+message: 'Funcionário criado com sucesso',
+funcionario: novo
+})
+} catch (error) {
+res.status(500).json({ erro: error.message })
+}
+})
+
+// PUT
+app.put('/funcionarios/:id', async (req, res) => {
+const { id } = req.params
+
+const [updated] = await Funcionario.update(req.body, {
+where: { id }
+})
+
+if (updated) {
+const atualizado = await Funcionario.findByPk(id)
+return res.json(atualizado)
+}
+
+res.status(404).json({ message: 'Funcionário não encontrado' })
+})
+
+// DELETE
+app.delete('/funcionarios/:id', async (req, res) => {
+    const { id } = req.params
+
+    const deleted = await Funcionario.destroy({
+        where: { id }
+    })
+
+    if (deleted) {
+        return res.status(204).send()
+    }
+
+    res.status(404).json({ message: 'Funcionário não encontrado' })
+})
+
+
+// ROTAS LIVRO
+
+
+// GET (com funcionário)
+app.get('/livros', async (req, res) => {
+    const dados = await Livro.findAll({
+        include: Funcionario
+    })
+    res.json(dados)
+})
+
+// POST
+app.post('/livros', async (req, res) => {
     try {
-        const { nome, email, telefone } = req.body
-        const novoCliente = await Cliente.create({ nome, email, telefone })
+        const novo = await Livro.create(req.body)
 
         res.status(201).json({
-            message: 'Cliente criado com sucesso',
-            cliente: novoCliente
+            message: 'Livro criado com sucesso',
+            livro: novo
         })
-
     } catch (error) {
-        res.status(500).json({
-            message: 'Erro ao criar cliente',
-            error: error.message
-        })
+        res.status(500).json({ erro: error.message })
     }
 })
 
-app.put('/clientes/:id', async (req, res) => {
-    try {
-        const { id } = req.params
-        const { nome, email, telefone } = req.body
+// PUT
+app.put('/livros/:id', async (req, res) => {
+    const { id } = req.params
 
-        const [updated] = await Cliente.update({ nome, email, telefone }, {
-            where: { id }
-        })
-        if (updated) {
-            const clienteAtualizado = await Cliente.findOne({ where: { id } })
-            return res.json({
-                message: 'Cliente atualizado com sucesso',
-                cliente: clienteAtualizado
-            })
-        }
+    const [updated] = await Livro.update(req.body, {
+        where: { id }
+    })
 
-        return res.status(404).json({ message: 'Cliente não encontrado' })
-    } catch (error) {
-        res.status(500).json({ erro: "Erro ao atualizar cliente" })
+    if (updated) {
+        const atualizado = await Livro.findByPk(id)
+        return res.json(atualizado)
     }
+
+    res.status(404).json({ message: 'Livro não encontrado' })
 })
 
-app.delete('/clientes/:id', async (req, res) => {
-    try { 
-        const { id } = req.params
+// DELETE
+app.delete('/livros/:id', async (req, res) => {
+    const { id } = req.params
 
-        const deleted = await Cliente.destroy({
-            where: { id }
-        })
-        if (deleted) {
-            return  res.status(204).json({ message: "Cliente deletado com sucesso" })
-        }
+    const deleted = await Livro.destroy({
+        where: { id }
+    })
 
-        return res.status(404).json({ message: "Cliente não encontrado" })
-    } catch (error) {
-        res.status(500).json({ message: "Erro ao excluir cliente" })
+    if (deleted) {
+        return res.status(204).send()
     }
+
+    res.status(404).json({ message: 'Livro não encontrado' })
 })
 
-// iniciar servidor
+
+//servidor
+
+
 sequelize.sync().then(() => {
 
-    console.log("👌 Banco rodando sincronizado.")
+    console.log(" Banco rodando sincronizado.")
 
     app.listen(port, () => {
-        console.log(`😎 Servidor rodando na porta ${port}`)
+        console.log(` Servidor rodando na porta ${port}`)
     })
 
 }).catch((error) => {
-    console.error('Erro ao sincronizar o banco de dados:')
+    console.error('Erro ao sincronizar o banco:')
     console.error(error)
 })
